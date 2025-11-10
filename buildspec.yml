@@ -2,29 +2,54 @@ version: 0.2
 
 env:
   variables:
-    IMAGE_REPO_NAME: my-lambda-container
-    IMAGE_TAG: latest
-    AWS_REGION: eu-west-1
-    LAMBDA_FUNCTION_NAME: MyLambdaContainerFunction
+    AWS_REGION: eu-west-1                      # 🟩 Change if your Lambda/ECR are in a different region
+    IMAGE_REPO_NAME: my-lambda-container       # 🟩 Your ECR repository name
+    LAMBDA_FUNCTION_NAME: MyLambdaContainerFunction  # 🟩 Your Lambda function name
+
+  # Option 1: you can hardcode your AWS account ID below
+  # OR Option 2: use SSM Parameter Store if you want (commented out)
+  # parameter-store:
+  #   ACCOUNT_ID: "/account/id"
 
 phases:
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
       - aws --version
-      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $YOUR_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-      - REPOSITORY_URI=$YOUR_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_REPO_NAME
+      - |
+        # 🔸 If you want to hardcode your account ID, set it here:
+        ACCOUNT_ID=991105135696   # 🟩 <<=== REPLACE THIS with your actual AWS account ID
+
+        # 🔸 If you'd rather let AWS detect it automatically, you can comment the line above
+        #     and uncomment the two lines below:
+        # if [ -z "$ACCOUNT_ID" ]; then
+        #   ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+        # fi
+
+      - echo ACCOUNT_ID=$ACCOUNT_ID
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      - REPOSITORY_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_REPO_NAME
+
   build:
     commands:
-      - echo Building the Docker image...
-      - docker build -t $IMAGE_REPO_NAME .
+      - echo Building Docker image...
+      - docker build --platform linux/amd64 -t $IMAGE_REPO_NAME .
+      - IMAGE_TAG=build-${CODEBUILD_BUILD_NUMBER}
       - docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:$IMAGE_TAG
+
   post_build:
     commands:
-      - echo Pushing the Docker image to ECR...
+      - echo Pushing image to ECR...
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo Updating Lambda function to use new image...
-      - aws lambda update-function-code --function-name $LAMBDA_FUNCTION_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG
+
+      - echo Getting image digest...
+      - IMAGE_DIGEST=$(aws ecr describe-images --repository-name $IMAGE_REPO_NAME --image-ids imageTag=$IMAGE_TAG --query 'imageDetails[0].imageDigest' --output text)
+      - IMAGE_URI=$REPOSITORY_URI@$IMAGE_DIGEST
+      - echo "Image URI with digest: $IMAGE_URI"
+
+      - echo Updating Lambda function to use image digest...
+      - aws lambda update-function-code --function-name $LAMBDA_FUNCTION_NAME --image-uri $IMAGE_URI
+      - echo "✅ Lambda function updated successfully!"
 artifacts:
   files:
     - '**/*'
