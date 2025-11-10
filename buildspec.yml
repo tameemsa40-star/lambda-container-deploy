@@ -22,7 +22,7 @@ phases:
       - echo Building Docker image...
       - docker build --platform linux/amd64 -t $IMAGE_REPO_NAME .
       - IMAGE_TAG=build-${CODEBUILD_BUILD_NUMBER}
-      - docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:$IMAGE_TAG
+      - docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:$IMAGE_TAG   # ✅ This must be on one line
 
   post_build:
     commands:
