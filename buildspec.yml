@@ -4,7 +4,7 @@ env:
   variables:
     AWS_REGION: eu-west-1                      # 🟩 Change if your Lambda/ECR are in a different region
     IMAGE_REPO_NAME: my-lambda-container       # 🟩 Your ECR repository name
-    LAMBDA_FUNCTION_NAME: MyLambdaContainerFunction  # 🟩 Your Lambda function name
+    LAMBDA_FUNCTION_NAME: my-container-lambda  # 🟩 Your Lambda function name
 
   # Option 1: you can hardcode your AWS account ID below
   # OR Option 2: use SSM Parameter Store if you want (commented out)
