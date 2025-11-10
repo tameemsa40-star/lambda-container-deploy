@@ -1,5 +1,11 @@
-FROM public.ecr.aws/lambda/nodejs:20
+FROM public.ecr.aws/lambda/python:3.11
 
-COPY index.js ./
+# Copy function code
+COPY app.py ${LAMBDA_TASK_ROOT}
 
-CMD ["index.handler"]
+# (Optional) install dependencies
+COPY requirements.txt  .
+RUN pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
+
+# Command to run Lambda
+CMD ["app.handler"]
