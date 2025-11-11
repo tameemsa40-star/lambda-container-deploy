@@ -2,40 +2,21 @@ version: 0.2
 
 env:
   variables:
-    AWS_REGION: eu-west-1
-    IMAGE_REPO_NAME: my-lambda-container
-    LAMBDA_FUNCTION_NAME: my-container-lambda
+    REPO_URI: "991105135696.dkr.ecr.eu-west-1.amazonaws.com/my-lambda-container"
 
 phases:
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
-      - aws --version
-      - |
-        ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
-      - echo ACCOUNT_ID=$ACCOUNT_ID
-      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-      - REPOSITORY_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$IMAGE_REPO_NAME
-
+      - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin $REPO_URI
   build:
     commands:
       - echo Building Docker image...
-      - docker build --platform linux/amd64 -t $IMAGE_REPO_NAME .
-      - IMAGE_TAG=build-${CODEBUILD_BUILD_NUMBER}
-      - docker tag $IMAGE_REPO_NAME:latest $REPOSITORY_URI:$IMAGE_TAG   # ✅ This must be on one line
-
+      - docker build -t $REPO_URI:latest .
+      - docker push $REPO_URI:latest
   post_build:
     commands:
-      - echo Pushing image to ECR...
-      - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo Getting image digest...
-      - IMAGE_DIGEST=$(aws ecr describe-images --repository-name $IMAGE_REPO_NAME --image-ids imageTag=$IMAGE_TAG --query 'imageDetails[0].imageDigest' --output text)
-      - IMAGE_URI=$REPOSITORY_URI@$IMAGE_DIGEST
-      - echo "Image URI with digest: $IMAGE_URI"
-      - echo Updating Lambda function to use image digest...
-      - aws lambda update-function-code --function-name $LAMBDA_FUNCTION_NAME --image-uri $IMAGE_URI
-      - echo "✅ Lambda function updated successfully!"
-
-artifacts:
-  files:
-    - '**/*'
+      - echo Updating Lambda function...
+      - aws lambda update-function-code \
+          --function-name my-container-lambda \
+          --image-uri $REPO_URI:latest
