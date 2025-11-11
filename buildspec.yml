@@ -3,19 +3,30 @@ version: 0.2
 env:
   variables:
     REPO_URI: "991105135696.dkr.ecr.eu-west-1.amazonaws.com/my-lambda-container"
+    FUNCTION_NAME: "my-container-lambda"
 
 phases:
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin $REPO_URI
+
   build:
     commands:
       - echo Building Docker image...
       - docker build -t $REPO_URI:latest .
       - docker push $REPO_URI:latest
+
   post_build:
     commands:
-      - echo Updating Lambda function...
-      - IMAGE_URI="991105135696.dkr.ecr.eu-west-1.amazonaws.com/my-lambda-container:latest"
-      - aws lambda update-function-code --function-name my-container-lambda --image-uri $IMAGE_URI
+      - echo Verifying image exists in ECR...
+      - aws ecr describe-images --repository-name my-lambda-container --image-ids imageTag=latest
+      - echo Updating Lambda function with new image...
+      - aws lambda update-function-code \
+          --function-name $FUNCTION_NAME \
+          --image-uri $REPO_URI:latest
+
+artifacts:
+  files:
+    - '**/*'
+  discard-paths: yes
